@@ -1,0 +1,45 @@
+import requests
+from bs4 import BeautifulSoup
+import csv
+base_url = "https://www.amazon.in/s"
+headers = {"User-Agent": "Your User Agent String"}
+products = []
+for page_num in range(1, 21):  # Scrape 20 pages
+    params = {
+        "k": "bags",
+        "crid": "2M096C61O4MLT",
+        "qid": "1653308124",
+        "sprefix": "ba,aps,283",
+        "ref": f"sr_pg_{page_num}"
+    }
+    response = requests.get(base_url, headers=headers, params=params)
+    soup = BeautifulSoup(response.content, "html.parser")
+
+    for product in soup.find_all("div", class_="s-result-item"):
+        product_info = {}
+        # Extract product information (URL, Name, Price, Rating, Number of Reviews)
+        product_info["Product URL"] = product.find("a", class_="a-link-normal")["href"]
+        product_info["Product Name"] = product.find("span", class_="a-text-normal").text
+        product_info["Product Price"] = product.find("span", class_="a-offscreen").text
+        product_info["Rating"] = product.find("span", class_="a-icon-alt").text.split()[0]
+        product_info["Number of Reviews"] = product.find("span", class_="a-size-base").text
+
+        products.append(product_info)
+for product_info in products:
+    product_url = product_info["Product URL"]
+    response = requests.get(product_url, headers=headers)
+    soup = BeautifulSoup(response.content, "html.parser")
+
+    # Extract additional product information (Description, ASIN, Product Description, Manufacturer)
+    product_info["Description"] = soup.find("div", id="productDescription").text.strip()
+    product_info["ASIN"] = soup.find("th", string="ASIN").find_next("td").text
+    product_info["Product Description"] = soup.find("div", id="productDescription").text.strip()
+    product_info["Manufacturer"] = soup.find("a", id="bylineInfo").text.strip()
+
+# Save the scraped data to a CSV file
+with open("amazon_products.csv", mode="w", newline="", encoding="utf-8") as csv_file:
+    fieldnames = ["Product URL", "Product Name", "Product Price", "Rating", "Number of Reviews",
+                  "Description", "ASIN", "Product Description", "Manufacturer"]
+    writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(products)
